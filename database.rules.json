@@ -1,0 +1,42 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "devices": {
+      "khuta-esp32": {
+        "live": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === 'jLKPX7kXhkhpNFDqMK4G45dYkUI3'",
+          ".validate": "newData.hasChildren(['device_id', 'timestamp']) && newData.child('device_id').val() === 'khuta-esp32' && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 60000 && newData.child('timestamp').val() >= now - 120000",
+          "device_id": {
+            ".validate": "newData.isString() && newData.val() === 'khuta-esp32'"
+          },
+          "temperature_c": {
+            ".validate": "newData.isNumber() && newData.val() >= -55 && newData.val() <= 125"
+          },
+          "acceleration_ms2": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200"
+          },
+          "speed_kmh": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200"
+          },
+          "latitude": {
+            ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+          },
+          "longitude": {
+            ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+          },
+          "satellites": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    }
+  }
+}
