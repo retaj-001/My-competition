@@ -61,6 +61,7 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
 .pin.unavailable{display:none}
 .route{display:none}
 .map-link{display:inline-block;color:var(--brown);font-size:8px;font-weight:700;text-decoration:underline;text-underline-offset:2px;margin-top:3px}
+.map-link[hidden],.detail-map-link[hidden]{display:none!important}
 .detail-map.unavailable:after{display:none}
 .detail-map-link{position:absolute;inset:auto 16px 16px;z-index:2;background:rgba(255,253,249,.94);border:1px solid var(--line);border-radius:12px;color:var(--brown);font-size:11px;font-weight:700;text-align:center;text-decoration:none;padding:10px}
 @media(max-width:360px){.app{padding:10px}.card{padding:10px}.value{font-size:22px}.logo,.logo img{width:76px;height:76px}.logo{flex-basis:76px}}
@@ -135,6 +136,6 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
   </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.supabase.js"></script>
 </body>
 </html>
