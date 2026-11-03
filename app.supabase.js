@@ -1,5 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.public.js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.118.0?target=es2022";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.public.js?v=20261103-2";
 
 const DEVICE_ID = "khuta-esp32";
 const POLL_INTERVAL_MS = 2000;
@@ -33,6 +33,10 @@ const cleanNumber = value => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+const normalizeRpcReading = data => {
+  if (Array.isArray(data)) return data[0] ?? null;
+  return data && typeof data === "object" ? data : null;
 };
 const formatValue = (value, digits) => isNumber(value) ? value.toFixed(digits) : "غير متاح";
 const readingDate = () => isNumber(state.timestamp) ? new Date(state.timestamp) : null;
@@ -235,7 +239,7 @@ async function fetchLatestReading() {
       ({ data, error } = await supabase.rpc("latest_public_reading", { p_device_key: DEVICE_ID }));
     }
     if (error) throw error;
-    const reading = Array.isArray(data) ? data[0] : null;
+    const reading = normalizeRpcReading(data);
     state.connection = "connected";
     if (!reading) {
       state.temperature_c = null;
