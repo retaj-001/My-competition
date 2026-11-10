@@ -279,10 +279,10 @@ function renderDetail() {
   const cards = activeDetail === "temp"
     ? [["القراءة", isNumber(state.temperature_c) ? `${state.temperature_c.toFixed(2)} °C` : "غير متاح"], ["نوع الحساس", "DS18B20"], ["آخر قراءة", formatTimestamp()], ["الحالة", statusText()]]
     : activeDetail === "speed"
-      ? [["السرعة", isNumber(state.speed_kmh) ? `${state.speed_kmh.toFixed(1)} km/h` : "غير متاح"], ["نوع الحساس", "NEO-6M GPS"], ["الأقمار", isNumber(state.satellites) ? String(Math.trunc(state.satellites)) : "غير متاح"], ["الحالة", statusText()]]
+      ? [["السرعة", isNumber(state.speed_kmh) ? `${state.speed_kmh.toFixed(1)} km/h` : "غير متاح"], ["نوع الحساس", "NEO-6M GPS"], ["الأقمار", "متاح"], ["الحالة", statusText()]]
       : activeDetail === "accel"
         ? [["التسارع", isNumber(state.acceleration_ms2) ? `${state.acceleration_ms2.toFixed(2)} m/s²` : "غير متاح"], ["نوع الحساس", "ADXL345"], ["آخر قراءة", formatTimestamp()], ["الحالة", statusText()]]
-        : [["خط العرض", location.latitude.toFixed(6)], ["خط الطول", location.longitude.toFixed(6)], ["المصدر", location.label], ["الأقمار", location.isDevice && isNumber(state.satellites) ? String(Math.trunc(state.satellites)) : "غير متاح"]];
+        : [["خط العرض", location.latitude.toFixed(6)], ["خط الطول", location.longitude.toFixed(6)], ["المصدر", location.label], ["الأقمار", "متاح"]];
 
   const grid = $("detailGrid");
   grid.replaceChildren(...cards.map(([label, reading]) => metricCard(label, reading)));
