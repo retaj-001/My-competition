@@ -3,6 +3,11 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase-config.public.js?v=2
 
 const DEVICE_ID = "khuta-esp32";
 const POLL_INTERVAL_MS = 2000;
+const STABLE_LOCATION = Object.freeze({
+  latitude: 24.448053,
+  longitude: 46.119621,
+  label: "موقع الإسطبل"
+});
 
 const STALE_AFTER_MS = 10000;
 const $ = id => document.getElementById(id);
@@ -27,6 +32,12 @@ const detailMeta = {
 
 let activeDetail = null;
 let focusBeforeDetail = null;
+let mainMap = null;
+let mainMarker = null;
+let detailMap = null;
+let detailMarker = null;
+let currentLocationUrl = "";
+let renderedLocationKey = "";
 
 const isNumber = value => typeof value === "number" && Number.isFinite(value);
 const cleanNumber = value => {
@@ -38,6 +49,27 @@ const normalizeRpcReading = data => {
   if (Array.isArray(data)) return data[0] ?? null;
   return data && typeof data === "object" ? data : null;
 };
+const isValidGpsLocation = (latitude, longitude) => (
+  isNumber(latitude) &&
+  isNumber(longitude) &&
+  latitude >= -90 && latitude <= 90 &&
+  longitude >= -180 && longitude <= 180 &&
+  !(Math.abs(latitude) < 0.000001 && Math.abs(longitude) < 0.000001)
+);
+const displayLocation = () => {
+  if (isValidGpsLocation(state.latitude, state.longitude)) {
+    return {
+      latitude: state.latitude,
+      longitude: state.longitude,
+      label: "موقع الجهاز",
+      isDevice: true
+    };
+  }
+  return { ...STABLE_LOCATION, isDevice: false };
+};
+const openStreetMapUrl = location => (
+  `https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=17/${location.latitude}/${location.longitude}`
+);
 const formatValue = (value, digits) => isNumber(value) ? value.toFixed(digits) : "غير متاح";
 const readingDate = () => isNumber(state.timestamp) ? new Date(state.timestamp) : null;
 const isFresh = () => readingDate() !== null && Date.now() - state.timestamp <= STALE_AFTER_MS;
@@ -101,19 +133,87 @@ function renderStatus() {
 }
 
 function renderLocation() {
-  const valid = isNumber(state.latitude) && isNumber(state.longitude);
-  $("lat").textContent = valid ? state.latitude.toFixed(6) : "غير متاح";
-  $("lng").textContent = valid ? state.longitude.toFixed(6) : "غير متاح";
-  $("sat").textContent = isNumber(state.satellites)
-    ? `${Math.trunc(state.satellites)} أقمار صناعية`
-    : "عدد الأقمار غير متاح";
-  $("pin").classList.toggle("unavailable", !valid);
-  $("gpsLink").hidden = !valid;
-  if (valid) {
-    const url = `https://www.openstreetmap.org/?mlat=${state.latitude}&mlon=${state.longitude}#map=16/${state.latitude}/${state.longitude}`;
-    $("gpsLink").href = url;
-    $("detailMapLink").href = url;
+  const location = displayLocation();
+  $("locationLabel").textContent = location.label;
+  $("locationCard").setAttribute("aria-label", `خريطة ${location.label}`);
+  $("lat").textContent = location.latitude.toFixed(6);
+  $("lng").textContent = location.longitude.toFixed(6);
+  $("sat").textContent = location.isDevice
+    ? (isNumber(state.satellites) ? `${Math.trunc(state.satellites)} أقمار صناعية` : "إحداثيات GPS من الجهاز")
+    : "الموقع الثابت";
+  currentLocationUrl = openStreetMapUrl(location);
+  $("gpsLink").href = currentLocationUrl;
+  $("detailMapLink").href = currentLocationUrl;
+  updateMaps(location);
+}
+
+function createMap(elementId, zoom) {
+  const map = window.L.map(elementId, {
+    zoomControl: true,
+    attributionControl: true,
+    scrollWheelZoom: true
+  });
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+  map.setView([STABLE_LOCATION.latitude, STABLE_LOCATION.longitude], zoom);
+  map.on("click", () => {
+    if (currentLocationUrl) window.open(currentLocationUrl, "_blank", "noopener,noreferrer");
+  });
+  return map;
+}
+
+function createMarker(map, location) {
+  const icon = window.L.divIcon({
+    className: "khuta-marker-wrap",
+    html: '<span class="khuta-marker" aria-hidden="true"></span>',
+    iconSize: [25, 34],
+    iconAnchor: [12, 31]
+  });
+  return window.L.marker([location.latitude, location.longitude], {
+    icon,
+    title: location.label,
+    keyboard: true
+  }).addTo(map);
+}
+
+function updateMap(map, marker, location, zoom) {
+  const coordinates = [location.latitude, location.longitude];
+  if (marker) {
+    marker.setLatLng(coordinates);
+    marker.options.title = location.label;
+    const markerElement = marker.getElement();
+    if (markerElement) {
+      markerElement.title = location.label;
+      markerElement.setAttribute("aria-label", location.label);
+    }
   }
+  map.setView(coordinates, zoom, { animate: false });
+}
+
+function updateMaps(location) {
+  if (!window.L) return;
+  if (!mainMap) {
+    mainMap = createMap("mainMap", 16);
+    mainMarker = createMarker(mainMap, location);
+  }
+  const locationKey = `${location.latitude},${location.longitude},${location.label}`;
+  if (renderedLocationKey !== locationKey) {
+    updateMap(mainMap, mainMarker, location, 16);
+    if (detailMap) updateMap(detailMap, detailMarker, location, 17);
+    renderedLocationKey = locationKey;
+  }
+}
+
+function showDetailMap(location) {
+  if (!window.L) return;
+  if (!detailMap) {
+    detailMap = createMap("detailMap", 17);
+    detailMarker = createMarker(detailMap, location);
+  }
+  updateMap(detailMap, detailMarker, location, 17);
+  requestAnimationFrame(() => detailMap.invalidateSize());
 }
 
 function renderMain() {
@@ -153,15 +253,24 @@ function metricCard(label, value) {
 function renderDetail() {
   if (!activeDetail) return;
   const meta = detailMeta[activeDetail];
-  const value = state[meta.key];
+  const location = displayLocation();
+  const value = activeDetail === "gps" ? location.latitude : state[meta.key];
   $("detailTitle").textContent = meta.title;
-  $("detailSensor").textContent = meta.sensor;
+  $("detailSensor").textContent = activeDetail === "gps" ? location.label : meta.sensor;
   $("detailUnit").textContent = isNumber(value) ? meta.unit : "";
-  $("detailMode").textContent = isFresh() ? "مباشر" : "غير مباشر";
-  $("detailSubtitle").textContent = activeDetail === "gps" ? "الإحداثيات الحقيقية من GPS" : "سجل القراءات الحقيقية منذ فتح الصفحة";
+  $("detailMode").textContent = activeDetail === "gps"
+    ? (location.isDevice ? (isFresh() ? "GPS مباشر" : "GPS") : "موقع ثابت")
+    : (isFresh() ? "مباشر" : "غير مباشر");
+  $("detailSubtitle").textContent = activeDetail === "gps"
+    ? (location.isDevice ? "الموقع الفعلي من GPS" : "موقع الإسطبل")
+    : "سجل القراءات الحقيقية منذ فتح الصفحة";
   $("detailReading").classList.toggle("compact", activeDetail === "gps" || !isNumber(value));
   $("detailValue").textContent = formatValue(value, meta.digits);
-  $("detailUpdated").textContent = formatTimestamp();
+  $("detailHistoryLabel").textContent = activeDetail === "gps"
+    ? (location.isDevice ? "قراءات GPS منذ فتح الصفحة" : "موقع الإسطبل")
+    : "قراءات حقيقية منذ فتح الصفحة";
+  $("detailUpdated").textContent = activeDetail === "gps" && !location.isDevice ? "موقع ثابت" : formatTimestamp();
+  $("detailChartPanel").hidden = activeDetail === "gps" && !location.isDevice;
 
   const path = chartPath(history[activeDetail]);
   $("detailLine").setAttribute("d", path.line);
@@ -173,14 +282,12 @@ function renderDetail() {
       ? [["السرعة", isNumber(state.speed_kmh) ? `${state.speed_kmh.toFixed(1)} km/h` : "غير متاح"], ["نوع الحساس", "NEO-6M GPS"], ["الأقمار", isNumber(state.satellites) ? String(Math.trunc(state.satellites)) : "غير متاح"], ["الحالة", statusText()]]
       : activeDetail === "accel"
         ? [["التسارع", isNumber(state.acceleration_ms2) ? `${state.acceleration_ms2.toFixed(2)} m/s²` : "غير متاح"], ["نوع الحساس", "ADXL345"], ["آخر قراءة", formatTimestamp()], ["الحالة", statusText()]]
-        : [["خط العرض", formatValue(state.latitude, 6)], ["خط الطول", formatValue(state.longitude, 6)], ["الأقمار", isNumber(state.satellites) ? String(Math.trunc(state.satellites)) : "غير متاح"], ["الحالة", statusText()]];
+        : [["خط العرض", location.latitude.toFixed(6)], ["خط الطول", location.longitude.toFixed(6)], ["المصدر", location.label], ["الأقمار", location.isDevice && isNumber(state.satellites) ? String(Math.trunc(state.satellites)) : "غير متاح"]];
 
   const grid = $("detailGrid");
   grid.replaceChildren(...cards.map(([label, reading]) => metricCard(label, reading)));
-  const validLocation = isNumber(state.latitude) && isNumber(state.longitude);
-  $("detailMap").hidden = activeDetail !== "gps";
-  $("detailMap").classList.toggle("unavailable", !validLocation);
-  $("detailMapLink").hidden = !validLocation;
+  $("detailMapWrap").hidden = activeDetail !== "gps";
+  if (activeDetail === "gps") showDetailMap(location);
 }
 
 function openDetail(key) {
@@ -215,6 +322,7 @@ document.querySelectorAll("[data-detail]").forEach(element => {
     }
   });
 });
+$("gpsDetails").addEventListener("click", () => openDetail("gps"));
 $("detailBack").addEventListener("click", closeDetail);
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && activeDetail) closeDetail();

@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--bg:#f3efe8;--card:#fffdf9;--ink:#181716;--muted:#7a746d;--line:#ded7ce;--dark:#181818;--brown:#7d6650;--green:#6d856e;--warn:#b27f47}
 *{box-sizing:border-box}
@@ -46,11 +47,10 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
 .note{font-size:8px;color:var(--warn);margin-top:5px}
 .bars{height:46px;display:flex;align-items:flex-end;gap:4px;margin-top:10px;direction:ltr}
 .bars i{flex:1;border-radius:4px 4px 2px 2px;background:linear-gradient(#806954,#cbb8a4);min-height:4px;transition:height .5s}
-.map{height:165px;position:relative;overflow:hidden;padding:0}
-.mapbg{position:absolute;inset:0;background:linear-gradient(25deg,transparent 0 42%,#ddd4ca 43% 45%,transparent 46%),linear-gradient(-17deg,transparent 0 55%,#ddd4ca 56% 58%,transparent 59%),#f4efe9}
-.route{position:absolute;left:12%;right:13%;top:48%;height:4px;background:var(--brown);border-radius:999px;transform:rotate(-7deg);transition:transform .8s}
-.pin{position:absolute;left:60%;top:43%;width:14px;height:14px;border-radius:50%;background:#171717;box-shadow:0 0 0 6px rgba(0,0,0,.1);transition:left 1.4s,top 1.4s}
-.mapinfo{position:absolute;left:9px;right:9px;bottom:9px;background:rgba(255,253,249,.95);border:1px solid var(--line);border-radius:12px;padding:8px 9px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.map{height:190px;position:relative;overflow:hidden;padding:0;isolation:isolate}
+.map-canvas{position:absolute;z-index:0;inset:0;background:#e9e3db;cursor:grab}
+.map-canvas:active{cursor:grabbing}
+.mapinfo{position:absolute;z-index:500;left:9px;right:9px;bottom:9px;background:rgba(255,253,249,.95);border:1px solid var(--line);border-radius:12px;padding:8px 9px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 5px 16px rgba(58,45,34,.08);backdrop-filter:blur(6px)}
 .mapinfo b{font-size:9px}.mapinfo span{display:block;font-size:7px;color:var(--muted);margin-top:2px}
 .reading-stamp{display:flex;align-items:center;justify-content:flex-start;gap:8px;color:var(--muted);font-size:10px;padding:0 3px 11px}
 .reading-stamp b{color:var(--brown);font-weight:700;font-size:11px;direction:rtl}
@@ -58,12 +58,22 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
 .blink{display:inline-block;width:7px;height:7px;border-radius:50%;background:#6d856e;margin-left:3px}
 .blink.paused{background:#b27f47}
 .stale-data .ready{color:#85591f;background:#f6ead8;border-color:#ead4b5}
-.pin.unavailable{display:none}
-.route{display:none}
 .map-link{display:inline-block;color:var(--brown);font-size:8px;font-weight:700;text-decoration:underline;text-underline-offset:2px;margin-top:3px}
+.map-actions{display:flex;align-items:center;gap:8px}
+.map-detail-button{border:0;background:transparent;color:var(--brown);font-size:8px;font-weight:700;text-decoration:underline;text-underline-offset:2px;padding:3px 0 0}
 .map-link[hidden],.detail-map-link[hidden]{display:none!important}
-.detail-map.unavailable:after{display:none}
-.detail-map-link{position:absolute;inset:auto 16px 16px;z-index:2;background:rgba(255,253,249,.94);border:1px solid var(--line);border-radius:12px;color:var(--brown);font-size:11px;font-weight:700;text-align:center;text-decoration:none;padding:10px}
+.detail-map-wrap{position:relative;margin-top:12px;isolation:isolate}
+.detail-map-wrap[hidden]{display:none!important}
+.detail-map-link{position:absolute;inset:auto 16px 16px;z-index:500;background:rgba(255,253,249,.94);border:1px solid var(--line);border-radius:12px;color:var(--brown);font-size:11px;font-weight:700;text-align:center;text-decoration:none;padding:10px;box-shadow:0 5px 16px rgba(58,45,34,.08)}
+.leaflet-container{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;background:#e9e3db}
+.map .leaflet-bottom.leaflet-right,.detail-map .leaflet-bottom.leaflet-right{top:0;bottom:auto}
+.leaflet-control-attribution{font-size:7px!important;background:rgba(255,253,249,.86)!important;color:var(--muted)!important}
+.leaflet-control-attribution a{color:var(--brown)!important}
+.leaflet-control-zoom{border:1px solid var(--line)!important;box-shadow:0 4px 12px rgba(58,45,34,.08)!important}
+.leaflet-control-zoom a{background:rgba(255,253,249,.96)!important;color:var(--ink)!important;border-color:var(--line)!important}
+.khuta-marker-wrap{background:transparent;border:0}
+.khuta-marker{position:relative;display:block;width:25px;height:25px;background:var(--dark);border:4px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 4px 12px rgba(0,0,0,.28)}
+.khuta-marker:after{content:"";position:absolute;width:7px;height:7px;inset:5px;border-radius:50%;background:#c7ac8e}
 @media(max-width:360px){.app{padding:10px}.card{padding:10px}.value{font-size:22px}.logo,.logo img{width:76px;height:76px}.logo{flex-basis:76px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}
 
@@ -96,9 +106,8 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
 .detail-metric span{display:block;color:var(--muted);font-size:11px;margin-bottom:9px}
 .detail-metric b{display:block;font-size:18px;direction:ltr;text-align:right;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 .detail-info{color:var(--muted);font-size:11px;line-height:1.9;padding:17px 3px 0}
-.detail-map{height:180px;background:linear-gradient(35deg,transparent 0 45%,#d8cdc0 46% 48%,transparent 49%),linear-gradient(-24deg,transparent 0 55%,#ddd3c7 56% 58%,transparent 59%),#f3eae0;border:1px solid #d8ccbe;border-radius:18px;margin-top:12px;position:relative;overflow:hidden}
-.detail-map:after{content:"";position:absolute;top:39%;left:47%;height:18px;width:18px;border:5px solid #fff;background:#171717;border-radius:50%;box-shadow:0 0 0 8px rgba(0,0,0,.12)}
-.detail-map[hidden]{display:none!important}
+.detail-chart-panel[hidden]{display:none!important}
+.detail-map{height:220px;background:#e9e3db;border:1px solid #d8ccbe;border-radius:18px;position:relative;z-index:0;overflow:hidden}
 @media(min-width:760px){.detail-app{padding-top:32px}}
 @media(prefers-reduced-motion:reduce){.detail-trigger{transition:none}}
 </style>
@@ -115,7 +124,7 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
 <article class="card wide detail-trigger" data-detail="accel" role="button" tabindex="0" aria-label="تكبير مؤشر التسارع"><div class="top"><div class="title">التسارع والحركة</div><div class="icon"><svg viewBox="0 0 24 24"><path d="M5 17 10 12l3 3 6-7"/><path d="M15 8h4v4"/></svg></div></div><div class="value"><span id="accel">غير متاح</span> <span class="unit">m/s²</span></div><div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="note">ADXL345 · مقدار التسارع يشمل الجاذبية</div></article>
 </section>
 <div class="section"><h3>الموقع</h3><span>GPS</span></div>
-<section class="card map detail-trigger" data-detail="gps" role="button" tabindex="0" aria-label="تكبير مؤشر الموقع"><div class="mapbg"></div><div class="route" id="route"></div><div class="pin" id="pin"></div><div class="mapinfo"><div><b>الموقع</b><span id="sat">عدد الأقمار غير متاح</span><a class="map-link" id="gpsLink" target="_blank" rel="noopener noreferrer" hidden>فتح الخريطة</a></div><div dir="ltr" style="text-align:left"><b id="lat">غير متاح</b><span id="lng">غير متاح</span></div></div></section>
+<section class="card map" id="locationCard" aria-label="خريطة موقع الإسطبل"><div class="map-canvas" id="mainMap" aria-label="خريطة OpenStreetMap تفاعلية"></div><div class="mapinfo"><div><b id="locationLabel">موقع الإسطبل</b><span id="sat">الموقع الثابت</span><div class="map-actions"><a class="map-link" id="gpsLink" target="_blank" rel="noopener noreferrer">فتح في الخرائط</a><button class="map-detail-button" id="gpsDetails" type="button">التفاصيل</button></div></div><div dir="ltr" style="text-align:left"><b id="lat">24.448053</b><span id="lng">46.119621</span></div></div></section>
 <footer class="small-footer">خُطى — نظام مراقبة الخيل الذكي</footer>
 </main>
 <div class="detail-overlay" id="detailOverlay" hidden aria-hidden="true">
@@ -127,15 +136,15 @@ button:focus-visible{outline:2px solid #b27f47;outline-offset:3px}
       <div class="detail-herotop"><span id="detailSensor">DS18B20</span><span class="detail-chip" id="detailMode">غير مباشر</span></div>
       <div class="detail-reading" id="detailReading"><b id="detailValue">غير متاح</b><small id="detailUnit">°C</small></div>
       <p class="detail-sub" id="detailSubtitle">متابعة المؤشر</p>
-      <div class="detail-chart"><svg id="detailChart" viewBox="0 0 340 130" preserveAspectRatio="none" aria-label="رسم تغير القراءة"><defs><linearGradient id="detailGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bda182" stop-opacity=".5"/><stop offset="1" stop-color="#bda182" stop-opacity="0"/></linearGradient></defs><path id="detailArea" fill="url(#detailGradient)" d=""/><path id="detailLine" fill="none" stroke="#d2b99f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d=""/></svg></div>
-      <div class="detail-chart-footer"><span>قراءات حقيقية منذ فتح الصفحة</span><span id="detailUpdated">لا توجد قراءة</span></div>
+      <div class="detail-chart-panel" id="detailChartPanel"><div class="detail-chart"><svg id="detailChart" viewBox="0 0 340 130" preserveAspectRatio="none" aria-label="رسم تغير القراءة"><defs><linearGradient id="detailGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bda182" stop-opacity=".5"/><stop offset="1" stop-color="#bda182" stop-opacity="0"/></linearGradient></defs><path id="detailArea" fill="url(#detailGradient)" d=""/><path id="detailLine" fill="none" stroke="#d2b99f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d=""/></svg></div><div class="detail-chart-footer"><span id="detailHistoryLabel">قراءات حقيقية منذ فتح الصفحة</span><span id="detailUpdated">لا توجد قراءة</span></div></div>
     </section>
     <div class="detail-grid" id="detailGrid"></div>
-    <div class="detail-map" id="detailMap" hidden><a class="detail-map-link" id="detailMapLink" target="_blank" rel="noopener noreferrer">فتح الموقع الحقيقي على الخريطة</a></div>
+    <div class="detail-map-wrap" id="detailMapWrap" hidden><div class="detail-map" id="detailMap" aria-label="خريطة OpenStreetMap تفاعلية"></div><a class="detail-map-link" id="detailMapLink" target="_blank" rel="noopener noreferrer">فتح في الخرائط</a></div>
     
   </div>
 </div>
 
-<script type="module" src="./app.supabase.js?v=20261103-2"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="./app.supabase.js?v=20261110-1"></script>
 </body>
 </html>
